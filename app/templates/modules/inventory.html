@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, stock_badge, expiry_badge, pagination, empty_row %}
+{% set can_manage = current_user.has_permission("inventory.manage") %}
+{% block content %}
+{% call page_header("Stock & Batches", "Sellable stock excludes expired batches. Sales always deduct from the earliest-expiring batch first.") %}
+  {% if can_manage %}<button class="button primary" type="button" data-modal-open="stock-in-modal"><i class="fa-solid fa-plus"></i> Receive stock</button>{% endif %}
+{% endcall %}
+
+<div class="stat-grid compact">
+  <a class="stat-card stat-link" href="{{ url_for('inventory.index') }}"><div class="stat-icon tone-primary"><i class="fa-solid fa-pills"></i></div><div class="stat-body"><div class="stat-label">Active products</div><div class="stat-value">{{ summary.products }}</div></div></a>
+  <a class="stat-card stat-link" href="{{ url_for('inventory.index', status='low') }}"><div class="stat-icon tone-warning"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="stat-body"><div class="stat-label">Low stock</div><div class="stat-value">{{ summary.low }}</div></div></a>
+  <a class="stat-card stat-link" href="{{ url_for('inventory.index', status='out') }}"><div class="stat-icon tone-danger"><i class="fa-solid fa-circle-xmark"></i></div><div class="stat-body"><div class="stat-label">Out of stock</div><div class="stat-value">{{ summary.out }}</div></div></a>
+  <a class="stat-card stat-link" href="{{ url_for('inventory.index', tab='batches', status='expiring') }}"><div class="stat-icon tone-violet"><i class="fa-solid fa-hourglass-half"></i></div><div class="stat-body"><div class="stat-label">Expiring ≤ {{ window }} days</div><div class="stat-value">{{ summary.expiring }}</div>{% if summary.expired %}<div class="stat-foot">{{ summary.expired }} batch(es) expired</div>{% endif %}</div></a>
+</div>
+
+<nav class="tabs" aria-label="Inventory views">
+  <a class="tab {{ 'active' if tab == 'stock' }}" href="{{ url_for('inventory.index') }}"><i class="fa-solid fa-boxes-stacked"></i> Stock levels</a>
+  <a class="tab {{ 'active' if tab == 'batches' }}" href="{{ url_for('inventory.index', tab='batches') }}"><i class="fa-solid fa-barcode"></i> Batches & expiry</a>
+  <a class="tab {{ 'active' if tab == 'movements' }}" href="{{ url_for('inventory.index', tab='movements') }}"><i class="fa-solid fa-right-left"></i> Movement history</a>
+</nav>
+
+<section class="panel">
+  <form class="filter-bar" method="get">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="q" value="{{ search }}" placeholder="{{ 'Search product, note or action…' if tab == 'movements' else 'Search product, SKU or batch…' }}" {% if tab != 'movements' %}data-table-search{% endif %}></label>
+    <select name="status" data-auto-submit aria-label="Filter">
+      {% if tab == 'stock' %}
+        <option value="all">All stock levels</option><option value="low" {{ 'selected' if status == 'low' }}>Low stock</option><option value="out" {{ 'selected' if status == 'out' }}>Out of stock</option>
+      {% elif tab == 'batches' %}
+        <option value="all">All batches</option><option value="expiring" {{ 'selected' if status == 'expiring' }}>Expiring soon</option><option value="expired" {{ 'selected' if status == 'expired' }}>Expired</option>
+      {% else %}
+        <option value="all">All movements</option><option value="in" {{ 'selected' if status == 'in' }}>Stock in</option><option value="out" {{ 'selected' if status == 'out' }}>Stock out</option>
+      {% endif %}
+    </select>
+    <span class="result-count" data-result-count>{% if tab == 'movements' %}{{ pager.total }} movements{% else %}{{ rows|length }} records{% endif %}</span>
+  </form>
+
+  {% if tab == 'stock' %}
+  <div class="table-wrap"><table class="data-table" data-searchable-table>
+    <thead><tr><th>Product</th><th>Category</th><th class="num">Sellable</th><th class="num">Expired</th><th class="num">On hand</th><th class="num">Reorder level</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="strong">{{ row.product.name }}<span class="cell-sub">{{ row.product.sku }} · {{ row.product.unit }}</span></td>
+        <td>{{ row.product.category.name if row.product.category else "Uncategorized" }}</td>
+        <td class="num strong">{{ row.sellable|qty }}</td>
+        <td class="num">{% if row.expired > 0 %}<span class="quantity-change negative">{{ row.expired|qty }}</span>{% else %}0{% endif %}</td>
+        <td class="num">{{ row.on_hand|qty }}</td>
+        <td class="num">{{ row.level|qty }}</td>
+        <td>{{ stock_badge(row.status) }}</td>
+      </tr>
+      {% else %}{{ empty_row(7, "No products match this filter.", "fa-boxes-stacked") }}{% endfor %}
+    </tbody>
+  </table></div>
+
+  {% elif tab == 'batches' %}
+  <div class="table-wrap"><table class="data-table" data-searchable-table>
+    <thead><tr><th>Product</th><th>Batch</th><th class="num">Quantity</th><th>Expiration</th><th>Status</th><th class="num">Unit cost</th><th class="num">Price</th>{% if can_manage %}<th class="num">Actions</th>{% endif %}</tr></thead>
+    <tbody>
+      {% for batch, state, days_left in rows %}
+      <tr>
+        <td class="strong">{{ batch.product.name }}</td>
+        <td>{{ batch.batch_number }}</td>
+        <td class="num strong">{{ batch.quantity|qty }}</td>
+        <td>{{ batch.expiration_date.strftime("%b %d, %Y") }}</td>
+        <td>{{ expiry_badge(state, days_left) }}</td>
+        <td class="num">{{ batch.purchase_cost|peso }}</td>
+        <td class="num">{{ batch.selling_price|peso }}</td>
+        {% if can_manage %}<td class="num"><button class="button secondary sm" type="button" data-modal-open="adjust-modal" data-form-action="{{ url_for('inventory.adjust', batch_id=batch.id) }}" data-form-title="Adjust batch {{ batch.batch_number }}" data-record='{{ {"new_quantity": batch.quantity|qty, "reason": "expired" if state == "expired" else "count_correction", "product_label": batch.product.name ~ " · current " ~ (batch.quantity|qty)}|tojson }}'><i class="fa-solid fa-sliders"></i> Adjust</button></td>{% endif %}
+      </tr>
+      {% else %}{{ empty_row(8, "No batches with stock match this filter.", "fa-barcode") }}{% endfor %}
+    </tbody>
+  </table></div>
+
+  {% else %}
+  <div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Date</th><th>Product</th><th>Movement</th><th>Reference / note</th><th>By</th><th class="num">Change</th></tr></thead>
+    <tbody>
+      {% for log in pager.items %}
+      <tr>
+        <td class="nowrap">{{ log.created_at|localtime("%b %d, %Y %I:%M %p") }}</td>
+        <td class="strong">{{ log.product.name if log.product else "Removed product" }}</td>
+        <td>{{ badge('active' if log.quantity_change > 0 else 'ordered', log.action|replace('adjust_', 'Adjust: ')|replace('_', ' ')|title) }}</td>
+        <td>{{ log.note or "—" }}</td>
+        <td>{{ log.user.display_name if log.user else "System" }}</td>
+        <td class="num"><span class="quantity-change {{ 'positive' if log.quantity_change > 0 else 'negative' }}">{{ "+" if log.quantity_change > 0 else "" }}{{ log.quantity_change|qty }}</span></td>
+      </tr>
+      {% else %}{{ empty_row(6, "No stock movements found.", "fa-right-left") }}{% endfor %}
+    </tbody>
+  </table></div>
+  {{ pagination(pager) }}
+  {% endif %}
+</section>
+
+{% if can_manage %}
+{% call modal("stock-in-modal", "Receive stock", "Record an opening balance or a delivery without a purchase order.", "wide") %}
+<form method="post" class="form-stack" action="{{ url_for('inventory.stock_in') }}">
+  {{ csrf() }}
+  <div class="form-grid">
+    <div class="field full"><label for="s-product">Product</label><select id="s-product" name="product_id" required><option value="">Select a product…</option>{% for product in products %}<option value="{{ product.id }}">{{ product.name }} ({{ product.sku }})</option>{% endfor %}</select></div>
+    <div class="field"><label for="s-batch">Batch / lot number</label><input id="s-batch" name="batch_number" required maxlength="80"></div>
+    <div class="field"><label for="s-expiry">Expiration date</label><input id="s-expiry" name="expiration_date" type="date" required min="{{ today().isoformat() }}"></div>
+    <div class="field"><label for="s-qty">Quantity received</label><input id="s-qty" name="quantity" type="number" min="1" step="1" required inputmode="numeric"></div>
+    <div class="field"><label for="s-cost">Unit cost (₱)</label><input id="s-cost" name="purchase_cost" type="number" min="0" step="0.01" required inputmode="decimal"></div>
+    <div class="field"><label for="s-price">New selling price (₱)</label><input id="s-price" name="selling_price" type="number" min="0" step="0.01" inputmode="decimal"><span class="hint">Leave blank to keep the current shelf price.</span></div>
+    <div class="field"><label for="s-note">Note</label><input id="s-note" name="note" maxlength="255" placeholder="e.g. Opening balance"></div>
+  </div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-box"></i> Receive stock</button></div>
+</form>
+{% endcall %}
+{% call modal("adjust-modal", "Adjust batch") %}
+<form method="post" class="form-stack">
+  {{ csrf() }}
+  <div class="info-note"><i class="fa-solid fa-circle-info"></i><span data-fill="product_label"></span></div>
+  <div class="field"><label for="a-qty">New quantity</label><input id="a-qty" name="new_quantity" type="number" min="0" step="1" required inputmode="numeric"></div>
+  <div class="field"><label for="a-reason">Reason</label><select id="a-reason" name="reason" required>{% for key, label in reasons.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="a-note">Note</label><input id="a-note" name="note" maxlength="255" placeholder="Optional details"></div>
+  <input type="hidden" name="product_label">
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-check"></i> Save adjustment</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, pagination, empty_row %}
+{% block content %}
+{% call page_header("Customers", "Regular customers, senior citizen / PWD records and purchase history.") %}
+  <button class="button primary" type="button" data-modal-open="customer-modal" data-form-action="{{ url_for('customers.index') }}" data-form-title="Add customer"><i class="fa-solid fa-user-plus"></i> Add customer</button>
+{% endcall %}
+<section class="panel">
+  <form class="filter-bar" method="get">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="q" value="{{ filters.q }}" placeholder="Search name, phone or email…" data-table-search></label>
+    <select name="status" data-auto-submit aria-label="Status">
+      <option value="active" {{ 'selected' if filters.status == 'active' }}>Active</option>
+      <option value="inactive" {{ 'selected' if filters.status == 'inactive' }}>Inactive</option>
+      <option value="all" {{ 'selected' if filters.status == 'all' }}>All</option>
+    </select>
+    <span class="result-count" data-result-count>{{ pager.total }} customers</span>
+  </form>
+  <div class="table-wrap">
+    <table class="data-table" data-searchable-table>
+      <thead><tr><th>Customer</th><th>Phone</th><th>Email</th><th class="num">Visits</th><th class="num">Total spent</th><th>Last visit</th><th>Status</th><th class="num">Actions</th></tr></thead>
+      <tbody>
+        {% for customer in pager.items %}
+        {% set s = stats.get(customer.id, (0, 0, None)) %}
+        <tr>
+          <td class="strong"><a class="row-link" href="{{ url_for('customers.detail', customer_id=customer.id) }}">{{ customer.name }}</a>{% if customer.notes %}<span class="cell-sub">{{ customer.notes|truncate(60) }}</span>{% endif %}</td>
+          <td class="nowrap">{{ customer.phone or "—" }}</td>
+          <td>{{ customer.email or "—" }}</td>
+          <td class="num">{{ s[0] }}</td>
+          <td class="num strong">{{ s[1]|peso }}</td>
+          <td class="nowrap">{{ s[2]|localdate if s[2] else "—" }}</td>
+          <td>{{ badge('active' if customer.is_active else 'inactive') }}</td>
+          <td class="num"><div class="row-actions">
+            <button class="button secondary sm" type="button" data-modal-open="customer-modal" data-form-title="Edit customer" data-form-action="{{ url_for('customers.edit', customer_id=customer.id) }}" data-record='{{ {"name": customer.name, "phone": customer.phone or "", "email": customer.email or "", "notes": customer.notes or ""}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+          </div></td>
+        </tr>
+        {% else %}{{ empty_row(8, "No customers found.", "fa-users") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager) }}
+</section>
+{% call modal("customer-modal", "Add customer") %}
+<form method="post" class="form-stack" action="{{ url_for('customers.index') }}">
+  {{ csrf() }}
+  <div class="field"><label for="cu-name">Full name</label><input id="cu-name" name="name" required maxlength="180"></div>
+  <div class="form-grid">
+    <div class="field"><label for="cu-phone">Mobile number</label><input id="cu-phone" name="phone" maxlength="40" inputmode="tel" placeholder="09XX XXX XXXX"></div>
+    <div class="field"><label for="cu-email">Email</label><input id="cu-email" name="email" type="email" maxlength="254"></div>
+  </div>
+  <div class="field"><label for="cu-notes">Notes</label><textarea id="cu-notes" name="notes" rows="3" placeholder="e.g. Senior citizen ID no., maintenance medicines, allergies"></textarea></div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save customer</button></div>
+</form>
+{% endcall %}
+{% endblock %}

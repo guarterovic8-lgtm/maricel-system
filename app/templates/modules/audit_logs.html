@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, pagination, empty_row %}
+{% block content %}
+{{ page_header("Audit Logs", "A tamper-evident trail of sign-ins, sales, stock changes and administrative actions.") }}
+<section class="panel">
+  <form class="filter-bar" method="get">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="q" value="{{ filters.q }}" placeholder="Search action (e.g. sale, login, product), then Enter…"></label>
+    <select name="user" data-auto-submit aria-label="User"><option value="">All users</option>{% for user in users %}<option value="{{ user.id }}" {{ 'selected' if filters.user == user.id }}>{{ user.display_name }} (@{{ user.username }})</option>{% endfor %}</select>
+    <span class="result-count">{{ "{:,}".format(pager.total) }} events</span>
+  </form>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>When</th><th>Action</th><th>User</th><th>Record</th><th>Details</th><th>IP address</th></tr></thead>
+      <tbody>
+        {% for log in pager.items %}
+        {% set group = log.action.split('.')[0] %}
+        <tr>
+          <td class="nowrap">{{ log.created_at|localtime("%b %d, %Y %I:%M %p") }}</td>
+          <td><span class="badge badge-{{ {'auth': 'neutral', 'sale': 'success', 'purchase': 'info', 'inventory': 'warning', 'user': 'primary', 'settings': 'primary', 'employee': 'primary'}.get(group, 'neutral') }}">{{ log.action }}</span></td>
+          <td>{{ log.user.display_name if log.user else "System" }}</td>
+          <td>{{ log.entity_type or "—" }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</td>
+          <td style="white-space: normal; max-width: 360px;">{% if log.details %}{% for key, value in log.details.items() %}<span class="cell-sub"><strong>{{ key|replace('_', ' ') }}:</strong> {{ value|join(', ') if value is iterable and value is not string else value }}</span>{% endfor %}{% else %}—{% endif %}</td>
+          <td>{{ log.ip_address or "—" }}</td>
+        </tr>
+        {% else %}{{ empty_row(6, "No audit events found.", "fa-clipboard-list") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager) }}
+</section>
+{% endblock %}

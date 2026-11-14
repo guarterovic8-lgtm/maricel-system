@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, stock_badge, empty_row %}
+{% block content %}
+{% call page_header("Products", "Medicine and supply catalog with shelf prices and stock levels.") %}
+  <button class="button primary" type="button" data-modal-open="product-modal" data-form-action="{{ url_for('catalog.products') }}" data-form-title="Add product"><i class="fa-solid fa-plus"></i> Add product</button>
+{% endcall %}
+
+<section class="panel">
+  <form class="filter-bar" method="get">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="q" value="{{ filters.q }}" placeholder="Search name, generic name or SKU…" data-table-search></label>
+    <select name="category" data-auto-submit aria-label="Category">
+      <option value="">All categories</option>
+      {% for category in categories %}<option value="{{ category.id }}" {{ 'selected' if filters.category == category.id }}>{{ category.name }}</option>{% endfor %}
+    </select>
+    <select name="status" data-auto-submit aria-label="Status">
+      <option value="active" {{ 'selected' if filters.status == 'active' }}>Active</option>
+      <option value="inactive" {{ 'selected' if filters.status == 'inactive' }}>Inactive</option>
+      <option value="all" {{ 'selected' if filters.status == 'all' }}>All</option>
+    </select>
+    <span class="result-count" data-result-count>{{ rows|length }} of {{ total_count }} products</span>
+  </form>
+  <div class="table-wrap">
+    <table class="data-table" data-searchable-table>
+      <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th class="num">Actions</th></tr></thead>
+      <tbody>
+        {% for product, quantity, status in rows %}
+        <tr>
+          <td class="strong">{{ product.name }}{% if product.requires_prescription %} {{ badge('rx', 'Rx') }}{% endif %}<span class="cell-sub">{{ product.generic_name or "—" }}</span></td>
+          <td>{{ product.sku }}</td>
+          <td>{{ product.category.name if product.category else "Uncategorized" }}</td>
+          <td class="num strong">{{ product.selling_price|peso }}<span class="cell-sub">per {{ product.unit }}</span></td>
+          <td class="num">{{ quantity|qty }}<span class="cell-sub">reorder at {{ product.reorder_level|qty }}</span></td>
+          <td>{% if product.is_active %}{{ stock_badge(status) }}{% else %}{{ badge('inactive') }}{% endif %}</td>
+          <td class="num">
+            <div class="row-actions">
+              <button class="button secondary sm" type="button" data-modal-open="product-modal" data-form-title="Edit product"
+                data-form-action="{{ url_for('catalog.product_edit', product_id=product.id) }}"
+                data-record='{{ {"name": product.name, "sku": product.sku, "generic_name": product.generic_name or "", "category_id": product.category_id or "", "unit": product.unit, "selling_price": "%.2f"|format(product.selling_price), "reorder_level": product.reorder_level|qty, "requires_prescription": product.requires_prescription, "description": product.description or ""}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+              <form method="post" action="{{ url_for('catalog.product_toggle', product_id=product.id) }}" {% if product.is_active %}data-confirm="Deactivate {{ product.name }}? It will be hidden from the POS."{% endif %}>
+                {{ csrf() }}
+                <button class="button {{ 'danger-ghost' if product.is_active else 'ghost' }} sm" type="submit">{{ "Deactivate" if product.is_active else "Activate" }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}{{ empty_row(7, "No products match your filters.", "fa-pills") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% call modal("product-modal", "Add product", "Prices are per selling unit. Stock is added by receiving purchases or batches.", "wide") %}
+<form method="post" class="form-stack" action="{{ url_for('catalog.products') }}">
+  {{ csrf() }}
+  <div class="form-grid">
+    <div class="field full"><label for="p-name">Product name</label><input id="p-name" name="name" required maxlength="180" placeholder="e.g. Paracetamol 500mg Tablet"></div>
+    <div class="field"><label for="p-generic">Generic name</label><input id="p-generic" name="generic_name" maxlength="180"></div>
+    <div class="field"><label for="p-sku">SKU / code</label><input id="p-sku" name="sku" required maxlength="64"></div>
+    <div class="field"><label for="p-category">Category</label><select id="p-category" name="category_id"><option value="">Uncategorized</option>{% for category in categories if category.is_active %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="p-unit">Selling unit</label><input id="p-unit" name="unit" value="tablet" maxlength="30" required list="unit-options"><datalist id="unit-options"><option value="tablet"><option value="capsule"><option value="bottle"><option value="box"><option value="pack"><option value="piece"><option value="sachet"><option value="nebule"></datalist></div>
+    <div class="field"><label for="p-price">Selling price (₱)</label><input id="p-price" name="selling_price" type="number" min="0" step="0.01" value="0.00" inputmode="decimal"></div>
+    <div class="field"><label for="p-reorder">Reorder level</label><input id="p-reorder" name="reorder_level" type="number" min="0" step="1" value="0" inputmode="numeric"><span class="hint">Flag as low stock at or below this quantity.</span></div>
+    <div class="field full"><label for="p-description">Description / notes</label><textarea id="p-description" name="description" rows="2"></textarea></div>
+    <label class="check full"><input type="checkbox" name="requires_prescription"> Requires a doctor's prescription (Rx)</label>
+  </div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save product</button></div>
+</form>
+{% endcall %}
+{% endblock %}

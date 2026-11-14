@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, empty_row %}
+{% block content %}
+<a class="back-link" href="{{ url_for('customers.index') }}"><i class="fa-solid fa-arrow-left"></i> Back to customers</a>
+{% call page_header(customer.name, customer.phone or "No phone on file") %}
+  {{ badge('active' if customer.is_active else 'inactive') }}
+  <button class="button secondary" type="button" data-modal-open="customer-modal" data-form-title="Edit customer" data-form-action="{{ url_for('customers.edit', customer_id=customer.id) }}" data-record='{{ {"name": customer.name, "phone": customer.phone or "", "email": customer.email or "", "notes": customer.notes or ""}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+  <form method="post" action="{{ url_for('customers.toggle', customer_id=customer.id) }}">{{ csrf() }}<button class="button {{ 'danger-ghost' if customer.is_active else 'ghost' }}" type="submit">{{ "Deactivate" if customer.is_active else "Activate" }}</button></form>
+{% endcall %}
+<div class="stat-grid three">
+  <article class="stat-card"><div class="stat-icon tone-primary"><i class="fa-solid fa-bag-shopping"></i></div><div class="stat-body"><div class="stat-label">Visits</div><div class="stat-value">{{ visit_count }}</div></div></article>
+  <article class="stat-card"><div class="stat-icon tone-success"><i class="fa-solid fa-peso-sign"></i></div><div class="stat-body"><div class="stat-label">Lifetime spend</div><div class="stat-value">{{ lifetime_total|peso }}</div></div></article>
+  <article class="stat-card"><div class="stat-icon tone-info"><i class="fa-solid fa-calendar-check"></i></div><div class="stat-body"><div class="stat-label">Customer since</div><div class="stat-value">{{ customer.created_at|localdate }}</div></div></article>
+</div>
+<div class="two-column">
+  <section class="panel">
+    <div class="panel-heading"><div><h3>Purchase history</h3><p>{% if current_user.has_permission('sales.manage') %}Most recent 50 transactions{% else %}Transactions you processed{% endif %}</p></div></div>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Receipt</th><th>Date</th><th>Cashier</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for sale in sales %}
+        <tr>
+          <td class="strong"><a class="row-link" href="{{ url_for('sales.receipt', sale_id=sale.id) }}">{{ sale.receipt_number }}</a></td>
+          <td class="nowrap">{{ sale.sold_at|localtime }}</td>
+          <td>{{ sale.cashier.display_name if sale.cashier else "—" }}</td>
+          <td class="num strong">{{ sale.total_amount|peso }}</td>
+          <td>{{ badge(sale.status) }}</td>
+        </tr>
+        {% else %}{{ empty_row(5, "No purchases recorded for this customer yet.", "fa-receipt") }}{% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  <aside class="panel">
+    <div class="panel-heading"><div><h3>Details</h3></div></div>
+    <dl class="kv-list">
+      <div><dt>Phone</dt><dd>{{ customer.phone or "—" }}</dd></div>
+      <div><dt>Email</dt><dd>{{ customer.email or "—" }}</dd></div>
+      <div><dt>Notes</dt><dd>{{ customer.notes or "—" }}</dd></div>
+      <div><dt>Last updated</dt><dd>{{ customer.updated_at|localdate }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% call modal("customer-modal", "Edit customer") %}
+<form method="post" class="form-stack" action="{{ url_for('customers.edit', customer_id=customer.id) }}">
+  {{ csrf() }}
+  <div class="field"><label for="cu-name">Full name</label><input id="cu-name" name="name" required maxlength="180"></div>
+  <div class="form-grid">
+    <div class="field"><label for="cu-phone">Mobile number</label><input id="cu-phone" name="phone" maxlength="40" inputmode="tel"></div>
+    <div class="field"><label for="cu-email">Email</label><input id="cu-email" name="email" type="email" maxlength="254"></div>
+  </div>
+  <div class="field"><label for="cu-notes">Notes</label><textarea id="cu-notes" name="notes" rows="3"></textarea></div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save changes</button></div>
+</form>
+{% endcall %}
+{% endblock %}

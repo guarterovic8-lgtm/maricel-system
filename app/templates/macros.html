@@ -1,0 +1,80 @@
+{% macro badge(status, label=None) -%}
+{%- set tones = {
+  'active': 'success', 'completed': 'success', 'received': 'success', 'ok': 'success',
+  'inactive': 'neutral', 'cancelled': 'neutral',
+  'voided': 'danger', 'out': 'danger', 'expired': 'danger',
+  'ordered': 'warning', 'low': 'warning', 'expiring': 'warning',
+  'owner': 'primary', 'cashier': 'info', 'rx': 'info'
+} -%}
+<span class="badge badge-{{ tones.get((status or '')|lower, 'neutral') }}">{{ label or (status or '')|replace('_', ' ')|title }}</span>
+{%- endmacro %}
+
+{% macro stock_badge(status) -%}
+{%- set labels = {'ok': 'In stock', 'low': 'Low stock', 'out': 'Out of stock'} -%}
+{%- set icons = {'ok': 'fa-circle-check', 'low': 'fa-triangle-exclamation', 'out': 'fa-circle-xmark'} -%}
+<span class="badge badge-{{ {'ok': 'success', 'low': 'warning', 'out': 'danger'}[status] }}"><i class="fa-solid {{ icons[status] }}" aria-hidden="true"></i>{{ labels[status] }}</span>
+{%- endmacro %}
+
+{% macro expiry_badge(state, days_left) -%}
+{%- if state == 'expired' -%}
+<span class="badge badge-danger"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>Expired {{ -days_left }}d ago</span>
+{%- elif state == 'expiring' -%}
+<span class="badge badge-warning"><i class="fa-regular fa-clock" aria-hidden="true"></i>{{ days_left }} days left</span>
+{%- else -%}
+<span class="badge badge-success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>{{ days_left }} days</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro page_header(title, subtitle=None) %}
+<div class="page-header">
+  <div class="page-header-copy"><h2>{{ title }}</h2>{% if subtitle %}<p>{{ subtitle }}</p>{% endif %}</div>
+  {% if caller is defined %}<div class="page-actions">{{ caller() }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro stat(label, value, icon, tone='primary', foot=None, href=None) %}
+{% if href %}<a class="stat-card stat-link" href="{{ href }}">{% else %}<article class="stat-card">{% endif %}
+  <div class="stat-icon tone-{{ tone }}"><i class="fa-solid {{ icon }}" aria-hidden="true"></i></div>
+  <div class="stat-body">
+    <div class="stat-label">{{ label }}</div>
+    <div class="stat-value">{{ value }}</div>
+    {% if foot %}<div class="stat-foot">{{ foot }}</div>{% endif %}
+  </div>
+{% if href %}<i class="fa-solid fa-arrow-right stat-arrow" aria-hidden="true"></i></a>{% else %}</article>{% endif %}
+{% endmacro %}
+
+{% macro modal(id, title, subtitle=None, size='') %}
+<div class="modal-backdrop" id="{{ id }}" hidden>
+  <section class="modal-card {{ size }}" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-title">
+    <header class="modal-header">
+      <div><h3 id="{{ id }}-title" data-modal-title>{{ title }}</h3>{% if subtitle %}<p>{{ subtitle }}</p>{% endif %}</div>
+      <button class="icon-button" type="button" data-modal-close aria-label="Close dialog"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+    {{ caller() }}
+  </section>
+</div>
+{% endmacro %}
+
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+
+{% macro pagination(pager) %}
+{% if pager.pages > 1 %}
+<nav class="pagination" aria-label="Pagination">
+  <span class="pagination-info">Page {{ pager.page }} of {{ pager.pages }} · {{ "{:,}".format(pager.total) }} records</span>
+  <div class="pagination-links">
+    {% if pager.has_prev %}<a class="button secondary sm" href="{{ url_with(page=pager.prev_num) }}"><i class="fa-solid fa-chevron-left"></i> Prev</a>{% endif %}
+    {% for number in pager.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=1) %}
+      {% if number %}
+        {% if number == pager.page %}<span class="page-num current" aria-current="page">{{ number }}</span>
+        {% else %}<a class="page-num" href="{{ url_with(page=number) }}">{{ number }}</a>{% endif %}
+      {% else %}<span class="page-gap">…</span>{% endif %}
+    {% endfor %}
+    {% if pager.has_next %}<a class="button secondary sm" href="{{ url_with(page=pager.next_num) }}">Next <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+  </div>
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro empty_row(colspan, message, icon='fa-inbox') %}
+<tr class="empty-row"><td colspan="{{ colspan }}"><div class="empty-state"><i class="fa-solid {{ icon }}"></i><span>{{ message }}</span></div></td></tr>
+{% endmacro %}

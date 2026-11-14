@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, csrf %}
+{% block content %}
+<a class="back-link" href="{{ url_for('purchasing.purchases') }}"><i class="fa-solid fa-arrow-left"></i> Back to purchases</a>
+{{ page_header("New purchase", "Save as an order to receive later, or receive the delivery now to add stock immediately.") }}
+{% if not suppliers %}
+<div class="info-note section-gap"><i class="fa-solid fa-circle-info"></i><span>Add an active supplier first in <a class="row-link" href="{{ url_for('purchasing.suppliers') }}">Suppliers</a>.</span></div>
+{% else %}
+<form method="post" id="purchase-form" data-purchase-form>
+  {{ csrf() }}
+  <div class="two-column">
+    <section class="panel line-items">
+      <div class="panel-heading"><div><h3>Items</h3><p>Batch number and expiry are required when receiving now.</p></div><button class="button ghost sm" type="button" data-add-line><i class="fa-solid fa-plus"></i> Add line</button></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Qty</th><th>Unit cost (₱)</th><th>Selling price (₱)</th><th>Batch no.</th><th>Expiry</th><th class="num">Line total</th><th></th></tr></thead>
+          <tbody data-lines></tbody>
+        </table>
+      </div>
+      <template data-line-template>
+        <tr>
+          <td><select name="product_id" required aria-label="Product"><option value="">Select product…</option>{% for product in products %}<option value="{{ product.id }}" data-price="{{ '%.2f'|format(product.selling_price) }}">{{ product.name }}</option>{% endfor %}</select></td>
+          <td><input name="quantity" type="number" min="1" step="1" required inputmode="numeric" aria-label="Quantity"></td>
+          <td><input name="unit_cost" type="number" min="0" step="0.01" required inputmode="decimal" aria-label="Unit cost"></td>
+          <td><input name="selling_price" type="number" min="0" step="0.01" inputmode="decimal" aria-label="Selling price"></td>
+          <td><input name="batch_number" maxlength="80" aria-label="Batch number"></td>
+          <td><input name="expiration_date" type="date" min="{{ today_date.isoformat() }}" aria-label="Expiration date"></td>
+          <td class="line-total" data-line-total>₱0.00</td>
+          <td><button class="icon-button" type="button" aria-label="Remove line" data-remove-line><i class="fa-solid fa-trash-can"></i></button></td>
+        </tr>
+      </template>
+    </section>
+    <aside class="panel sticky-summary">
+      <div class="panel-heading"><div><h3>Purchase details</h3></div></div>
+      <div class="panel-body form-stack">
+        <div class="field"><label for="po-supplier">Supplier</label><select id="po-supplier" name="supplier_id" required><option value="">Select supplier…</option>{% for supplier in suppliers %}<option value="{{ supplier.id }}">{{ supplier.name }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="po-date">Purchase date</label><input id="po-date" name="purchased_at" type="date" value="{{ today_date.isoformat() }}" max="{{ today_date.isoformat() }}" required></div>
+        <div class="field"><label for="po-notes">Notes</label><textarea id="po-notes" name="notes" rows="2" placeholder="Delivery terms, invoice number…"></textarea></div>
+        <dl class="totals"><div><dt>Lines</dt><dd data-line-count>0</dd></div><div class="grand"><dt>Total</dt><dd data-grand-total>₱0.00</dd></div></dl>
+        <button class="button success full-width lg" type="submit" name="action" value="receive"><i class="fa-solid fa-box-open"></i> Save & receive now</button>
+        <button class="button secondary full-width" type="submit" name="action" value="order" formnovalidate data-order-button><i class="fa-solid fa-file-invoice"></i> Save as ordered</button>
+      </div>
+    </aside>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const form = document.querySelector("[data-purchase-form]");
+  if (!form) return;
+  const body = form.querySelector("[data-lines]");
+  const template = form.querySelector("[data-line-template]");
+  const peso = (value) => "₱" + value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const recalc = () => {
+    let total = 0;
+    const rows = body.querySelectorAll("tr");
+    rows.forEach((row) => {
+      const qty = parseFloat(row.querySelector("[name=quantity]").value) || 0;
+      const cost = parseFloat(row.querySelector("[name=unit_cost]").value) || 0;
+      row.querySelector("[data-line-total]").textContent = peso(qty * cost);
+      total += qty * cost;
+    });
+    form.querySelector("[data-line-count]").textContent = rows.length;
+    form.querySelector("[data-grand-total]").textContent = peso(total);
+  };
+  const addLine = () => {
+    const row = template.content.firstElementChild.cloneNode(true);
+    const headers = Array.from(form.querySelectorAll("thead th")).map((th) => th.textContent.trim());
+    Array.from(row.children).forEach((cell, index) => headers[index] && cell.setAttribute("data-label", headers[index]));
+    row.querySelector("[data-remove-line]").addEventListener("click", () => {
+      if (body.children.length > 1) { row.remove(); recalc(); }
+    });
+    const select = row.querySelector("select");
+    select.addEventListener("change", () => {
+      const price = select.selectedOptions[0]?.dataset.price;
+      const priceInput = row.querySelector("[name=selling_price]");
+      if (price && !priceInput.value && parseFloat(price) > 0) priceInput.value = price;
+    });
+    row.addEventListener("input", recalc);
+    body.append(row);
+    recalc();
+    return row;
+  };
+  form.querySelector("[data-add-line]").addEventListener("click", () => addLine().querySelector("select").focus());
+  addLine();
+  // Receiving requires batch details; ordering does not.
+  form.querySelectorAll("button[name=action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const receiving = button.value === "receive";
+      body.querySelectorAll("[name=expiration_date]").forEach((input) => { input.required = receiving; });
+    });
+  });
+  form.querySelector("[data-order-button]").addEventListener("click", (event) => {
+    const invalid = Array.from(body.querySelectorAll("select, [name=quantity], [name=unit_cost]")).find((input) => !input.value);
+    if (!form.querySelector("#po-supplier").value || invalid) {
+      event.preventDefault();
+      (invalid || form.querySelector("#po-supplier")).reportValidity?.();
+      if (!form.querySelector("#po-supplier").value) form.querySelector("#po-supplier").reportValidity();
+    }
+  });
+})();
+</script>
+{% endblock %}

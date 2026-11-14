@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, empty_row %}
+{% block content %}
+{% call page_header("Categories", "Group products for faster searching at the counter and clearer reports.") %}
+  <button class="button primary" type="button" data-modal-open="category-modal" data-form-action="{{ url_for('catalog.categories') }}" data-form-title="Add category"><i class="fa-solid fa-plus"></i> Add category</button>
+{% endcall %}
+<section class="panel">
+  <div class="filter-bar">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Search categories…" data-table-search></label>
+    <span class="result-count" data-result-count>{{ rows|length }} categories{% if uncategorized %} · {{ uncategorized }} uncategorized products{% endif %}</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" data-searchable-table>
+      <thead><tr><th>Category</th><th>Description</th><th class="num">Active products</th><th>Status</th><th>Added</th><th class="num">Actions</th></tr></thead>
+      <tbody>
+        {% for category, count in rows %}
+        <tr>
+          <td class="strong">{{ category.name }}</td>
+          <td>{{ category.description or "—" }}</td>
+          <td class="num"><a class="row-link" href="{{ url_for('catalog.products', category=category.id) }}">{{ count }}</a></td>
+          <td>{{ badge('active' if category.is_active else 'inactive') }}</td>
+          <td>{{ category.created_at|localdate }}</td>
+          <td class="num"><div class="row-actions">
+            <button class="button secondary sm" type="button" data-modal-open="category-modal" data-form-title="Edit category" data-form-action="{{ url_for('catalog.category_edit', category_id=category.id) }}" data-record='{{ {"name": category.name, "description": category.description or ""}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+            <form method="post" action="{{ url_for('catalog.category_toggle', category_id=category.id) }}">{{ csrf() }}<button class="button {{ 'danger-ghost' if category.is_active else 'ghost' }} sm" type="submit">{{ "Deactivate" if category.is_active else "Activate" }}</button></form>
+          </div></td>
+        </tr>
+        {% else %}{{ empty_row(6, "No categories yet. Add your first category.", "fa-layer-group") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% call modal("category-modal", "Add category") %}
+<form method="post" class="form-stack" action="{{ url_for('catalog.categories') }}">
+  {{ csrf() }}
+  <div class="field"><label for="c-name">Category name</label><input id="c-name" name="name" required maxlength="100"></div>
+  <div class="field"><label for="c-description">Description</label><textarea id="c-description" name="description" rows="3" maxlength="255"></textarea></div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save category</button></div>
+</form>
+{% endcall %}
+{% endblock %}

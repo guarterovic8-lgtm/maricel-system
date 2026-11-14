@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, csrf, badge %}
+{% block content %}
+{{ page_header("My account", "Your profile and sign-in security.") }}
+<div class="two-column">
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-heading"><div><h3>Change password</h3><p>Use at least 12 characters. Avoid reusing passwords from other sites.</p></div></div>
+      <form method="post" action="{{ url_for('main.account') }}" class="panel-body form-stack">
+        {{ csrf() }}
+        <div class="field"><label for="current_password">Current password</label><div class="password-field"><input id="current_password" name="current_password" type="password" autocomplete="current-password" required><button class="password-toggle" type="button" aria-label="Show password" data-password-toggle><i class="fa-regular fa-eye"></i></button></div></div>
+        <div class="form-grid">
+          <div class="field"><label for="new_password">New password</label><div class="password-field"><input id="new_password" name="new_password" type="password" minlength="12" autocomplete="new-password" required><button class="password-toggle" type="button" aria-label="Show password" data-password-toggle><i class="fa-regular fa-eye"></i></button></div></div>
+          <div class="field"><label for="confirm_password">Confirm new password</label><input id="confirm_password" name="confirm_password" type="password" minlength="12" autocomplete="new-password" required></div>
+        </div>
+        <div class="form-actions"><button class="button primary" type="submit"><i class="fa-solid fa-key"></i> Update password</button></div>
+      </form>
+    </section>
+    <section class="panel">
+      <div class="panel-heading"><div><h3>Contact details</h3></div></div>
+      <form method="post" action="{{ url_for('main.account_profile') }}" class="panel-body form-stack">
+        {{ csrf() }}
+        <div class="form-grid">
+          <div class="field"><label for="acc-email">Email</label><input id="acc-email" name="email" type="email" maxlength="254" value="{{ current_user.email or '' }}"></div>
+          {% if current_user.employee %}<div class="field"><label for="acc-phone">Phone</label><input id="acc-phone" name="phone" maxlength="40" value="{{ current_user.employee.phone or '' }}" inputmode="tel"></div>{% endif %}
+        </div>
+        <div class="form-actions"><button class="button secondary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save details</button></div>
+      </form>
+    </section>
+  </div>
+  <aside class="panel">
+    <div class="panel-heading"><div><h3>Profile</h3></div></div>
+    <div class="panel-body" style="text-align:center; padding-top: 4px;">
+      <span class="avatar" style="width:64px;height:64px;margin:0 auto 10px;font-size:24px;">{{ current_user.display_name[:1]|upper }}</span>
+      <strong style="display:block;color:var(--ink);font-size:16px;">{{ current_user.display_name }}</strong>
+      <span class="muted">@{{ current_user.username }}</span>
+      <div style="margin-top:8px;">{{ badge(current_user.role.name|lower, current_user.role_label) }}</div>
+    </div>
+    <dl class="kv-list">
+      {% if current_user.employee %}
+      <div><dt>Employee no.</dt><dd>{{ current_user.employee.employee_number }}</dd></div>
+      <div><dt>Position</dt><dd>{{ current_user.employee.position or "—" }}</dd></div>
+      {% endif %}
+      <div><dt>Last sign-in</dt><dd>{{ current_user.last_login_at|localtime if current_user.last_login_at else "—" }}</dd></div>
+      <div><dt>Access</dt><dd>{{ current_user.role.description or "—" }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% endblock %}

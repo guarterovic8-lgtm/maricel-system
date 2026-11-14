@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, badge, pagination, empty_row %}
+{% block content %}
+{% call page_header("Sales History" if can_manage else "My Sales", "All completed and voided transactions." if can_manage else "Sales you processed. Open a receipt to reprint it.") %}
+  <a class="button primary" href="{{ url_for('sales.pos') }}"><i class="fa-solid fa-cash-register"></i> New sale</a>
+{% endcall %}
+
+<div class="stat-grid three">
+  <article class="stat-card"><div class="stat-icon tone-primary"><i class="fa-solid fa-peso-sign"></i></div><div class="stat-body"><div class="stat-label">Completed sales total</div><div class="stat-value">{{ summary.total|peso }}</div><div class="stat-foot">{{ presets[filters.range] }}{% if filters.range == 'custom' %}: {{ filters.start }} → {{ filters.end }}{% endif %}</div></div></article>
+  <article class="stat-card"><div class="stat-icon tone-info"><i class="fa-solid fa-receipt"></i></div><div class="stat-body"><div class="stat-label">Completed transactions</div><div class="stat-value">{{ summary.count }}</div><div class="stat-foot">Matching current filters</div></div></article>
+  <article class="stat-card"><div class="stat-icon tone-success"><i class="fa-solid fa-scale-balanced"></i></div><div class="stat-body"><div class="stat-label">Average sale</div><div class="stat-value">{{ (summary.total / summary.count if summary.count else 0)|peso }}</div><div class="stat-foot">Per completed transaction</div></div></article>
+</div>
+
+<section class="panel">
+  <form class="filter-bar" method="get">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="q" value="{{ filters.q }}" placeholder="Receipt no. or customer, then Enter…"></label>
+    <select name="range" data-range-select aria-label="Date range">
+      {% for key, label in presets.items() %}<option value="{{ key }}" {{ 'selected' if filters.range == key }}>{{ label }}</option>{% endfor %}
+    </select>
+    <input type="date" name="start" value="{{ filters.start }}" data-custom-range aria-label="Start date">
+    <input type="date" name="end" value="{{ filters.end }}" data-custom-range aria-label="End date">
+    <select name="status" data-auto-submit aria-label="Status"><option value="">All statuses</option><option value="completed" {{ 'selected' if filters.status == 'completed' }}>Completed</option><option value="voided" {{ 'selected' if filters.status == 'voided' }}>Voided</option></select>
+    <select name="method" data-auto-submit aria-label="Payment method"><option value="">All payments</option>{% for key, label in payment_methods.items() %}<option value="{{ key }}" {{ 'selected' if filters.method == key }}>{{ label }}</option>{% endfor %}</select>
+    {% if can_manage %}<select name="cashier" data-auto-submit aria-label="Cashier"><option value="">All staff</option>{% for user in cashiers %}<option value="{{ user.id }}" {{ 'selected' if filters.cashier == user.id }}>{{ user.display_name }}</option>{% endfor %}</select>{% endif %}
+    <button class="button secondary sm" type="submit" data-custom-range><i class="fa-solid fa-filter"></i> Apply</button>
+  </form>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Receipt</th><th>Date & time</th>{% if can_manage %}<th>Cashier</th>{% endif %}<th>Customer</th><th>Payment</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for sale in pager.items %}
+        <tr>
+          <td class="strong"><a class="row-link" href="{{ url_for('sales.receipt', sale_id=sale.id) }}">{{ sale.receipt_number }}</a></td>
+          <td class="nowrap">{{ sale.sold_at|localtime }}</td>
+          {% if can_manage %}<td>{{ sale.cashier.display_name if sale.cashier else "—" }}</td>{% endif %}
+          <td>{{ sale.customer.name if sale.customer else "Walk-in" }}{% if sale.discount_type %}<span class="cell-sub">{{ sale.discount_type|upper if sale.discount_type == 'pwd' else sale.discount_type|title }} discount</span>{% endif %}</td>
+          <td>{{ payment_methods.get(sale.payments[0].method, '—') if sale.payments else '—' }}</td>
+          <td class="num strong">{{ sale.total_amount|peso }}</td>
+          <td>{{ badge(sale.status) }}</td>
+        </tr>
+        {% else %}{{ empty_row(7, "No sales found for these filters.", "fa-receipt") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager) }}
+</section>
+{% endblock %}

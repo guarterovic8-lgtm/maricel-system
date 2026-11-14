@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, empty_row %}
+{% block content %}
+{% call page_header("Expenses", "Operating costs such as rent, utilities and payroll. Used for net income in Reports.") %}
+  <button class="button primary" type="button" data-modal-open="expense-modal" data-form-action="{{ url_for('finance.expenses', month=month.strftime('%Y-%m')) }}" data-form-title="Record expense"><i class="fa-solid fa-plus"></i> Record expense</button>
+{% endcall %}
+<div class="two-column">
+  <section class="panel">
+    <form class="filter-bar" method="get">
+      <a class="icon-button" href="{{ url_for('finance.expenses', month=previous_month, category=category) }}" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></a>
+      <input type="month" name="month" value="{{ month.strftime('%Y-%m') }}" max="{{ today_date.strftime('%Y-%m') }}" data-auto-submit aria-label="Month">
+      {% if next_month %}<a class="icon-button" href="{{ url_for('finance.expenses', month=next_month, category=category) }}" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+      <select name="category" data-auto-submit aria-label="Category"><option value="">All categories</option>{% for item in categories %}<option value="{{ item }}" {{ 'selected' if category == item }}>{{ item }}</option>{% endfor %}</select>
+      <span class="result-count">{{ rows|length }} entries</span>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Recorded by</th><th class="num">Amount</th><th class="num">Actions</th></tr></thead>
+        <tbody>
+          {% for expense in rows %}
+          <tr>
+            <td class="nowrap">{{ expense.incurred_at|localdate }}</td>
+            <td class="strong">{{ expense.description }}</td>
+            <td>{{ expense.category }}</td>
+            <td>{{ expense.created_by.display_name if expense.created_by else "—" }}</td>
+            <td class="num strong">{{ expense.amount|peso }}</td>
+            <td class="num"><div class="row-actions">
+              <button class="button secondary sm" type="button" data-modal-open="expense-modal" data-form-title="Edit expense" data-form-action="{{ url_for('finance.expense_edit', expense_id=expense.id) }}" data-record='{{ {"category": expense.category, "description": expense.description, "amount": "%.2f"|format(expense.amount), "incurred_at": to_local(expense.incurred_at).date().isoformat()}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+              <form method="post" action="{{ url_for('finance.expense_delete', expense_id=expense.id) }}" data-confirm="Delete this expense?">{{ csrf() }}<button class="button danger-ghost sm" type="submit" aria-label="Delete"><i class="fa-solid fa-trash-can"></i></button></form>
+            </div></td>
+          </tr>
+          {% else %}{{ empty_row(6, "No expenses recorded for this month.", "fa-wallet") }}{% endfor %}
+        </tbody>
+        {% if rows %}<tfoot><tr><td colspan="4">Total{% if category %} · {{ category }}{% endif %}</td><td class="num">{{ rows|sum(attribute='amount')|peso }}</td><td></td></tr></tfoot>{% endif %}
+      </table>
+    </div>
+  </section>
+  <aside class="panel">
+    <div class="panel-heading"><div><h3>{{ month.strftime("%B %Y") }}</h3><p>Spending by category</p></div></div>
+    <div class="bar-list">
+      {% set top = by_category[0][1] if by_category else 0 %}
+      {% for name, amount in by_category %}
+      <div class="bar-row">
+        <div class="bar-row-head"><span class="bar-name">{{ name }}</span><span class="bar-value">{{ amount|peso }}</span></div>
+        <div class="bar-track"><span class="bar-fill" style="width: {{ '%.1f'|format((amount / top * 100) if top else 0) }}%"></span></div>
+        <small>{{ '%.1f'|format((amount / month_total * 100) if month_total else 0) }}% of month</small>
+      </div>
+      {% else %}<div class="empty-state"><i class="fa-solid fa-chart-bar"></i><span>Nothing recorded yet.</span></div>{% endfor %}
+    </div>
+    <dl class="kv-list"><div class="total"><dt>Month total</dt><dd>{{ month_total|peso }}</dd></div></dl>
+  </aside>
+</div>
+{% call modal("expense-modal", "Record expense") %}
+<form method="post" class="form-stack">
+  {{ csrf() }}
+  <div class="form-grid">
+    <div class="field"><label for="e-date">Date</label><input id="e-date" name="incurred_at" type="date" value="{{ today_date.isoformat() }}" max="{{ today_date.isoformat() }}" required></div>
+    <div class="field"><label for="e-category">Category</label><select id="e-category" name="category" required>{% for item in categories %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select></div>
+    <div class="field full"><label for="e-description">Description</label><input id="e-description" name="description" required maxlength="255" placeholder="e.g. Electricity bill — October"></div>
+    <div class="field full"><label for="e-amount">Amount (₱)</label><input id="e-amount" name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></div>
+  </div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save expense</button></div>
+</form>
+{% endcall %}
+{% endblock %}

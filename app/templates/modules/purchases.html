@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, badge, pagination, empty_row %}
+{% block content %}
+{% call page_header("Purchases", "Purchase orders and supplier deliveries. Receiving a purchase adds its batches to stock.") %}
+  <a class="button primary" href="{{ url_for('purchasing.purchase_new') }}"><i class="fa-solid fa-plus"></i> New purchase</a>
+{% endcall %}
+<nav class="tabs" aria-label="Purchase status">
+  <a class="tab {{ 'active' if not status }}" href="{{ url_for('purchasing.purchases') }}">All <span class="count">{{ totals.values()|sum }}</span></a>
+  {% for key, label in statuses.items() %}
+  <a class="tab {{ 'active' if status == key }}" href="{{ url_for('purchasing.purchases', status=key) }}">{{ label }} <span class="count">{{ totals.get(key, 0) }}</span></a>
+  {% endfor %}
+</nav>
+<section class="panel">
+  <form class="filter-bar" method="get">
+    <input type="hidden" name="status" value="{{ status }}">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="q" value="{{ search }}" placeholder="Search reference or supplier, then press Enter…"></label>
+    <span class="result-count">{{ pager.total }} purchases</span>
+  </form>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Reference</th><th>Supplier</th><th>Date</th><th class="num">Items</th><th class="num">Total</th><th>Status</th><th>Recorded by</th></tr></thead>
+      <tbody>
+        {% for purchase in pager.items %}
+        <tr>
+          <td class="strong"><a class="row-link" href="{{ url_for('purchasing.purchase_detail', purchase_id=purchase.id) }}">{{ purchase.reference }}</a></td>
+          <td>{{ purchase.supplier.name }}</td>
+          <td class="nowrap">{{ purchase.purchased_at|localdate }}</td>
+          <td class="num">{{ purchase.items|length }}</td>
+          <td class="num strong">{{ purchase.total_amount|peso }}</td>
+          <td>{{ badge(purchase.status) }}</td>
+          <td>{{ purchase.created_by.display_name if purchase.created_by else "—" }}</td>
+        </tr>
+        {% else %}{{ empty_row(7, "No purchases found.", "fa-cart-flatbed") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager) }}
+</section>
+{% endblock %}

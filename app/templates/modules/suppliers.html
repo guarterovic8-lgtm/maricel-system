@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, empty_row %}
+{% block content %}
+{% call page_header("Suppliers", "Distributors and wholesalers you purchase stock from.") %}
+  <button class="button primary" type="button" data-modal-open="supplier-modal" data-form-action="{{ url_for('purchasing.suppliers') }}" data-form-title="Add supplier"><i class="fa-solid fa-plus"></i> Add supplier</button>
+{% endcall %}
+<section class="panel">
+  <div class="filter-bar">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Search suppliers…" data-table-search></label>
+    <span class="result-count" data-result-count>{{ rows|length }} suppliers</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" data-searchable-table>
+      <thead><tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Email</th><th class="num">Received POs</th><th class="num">Total purchased</th><th>Status</th><th class="num">Actions</th></tr></thead>
+      <tbody>
+        {% for supplier, count, total in rows %}
+        <tr>
+          <td class="strong">{{ supplier.name }}<span class="cell-sub">{{ supplier.address or "" }}</span></td>
+          <td>{{ supplier.contact_person or "—" }}</td>
+          <td class="nowrap">{{ supplier.phone or "—" }}</td>
+          <td>{{ supplier.email or "—" }}</td>
+          <td class="num">{{ count }}</td>
+          <td class="num strong">{{ total|peso }}</td>
+          <td>{{ badge(supplier.status) }}</td>
+          <td class="num"><div class="row-actions">
+            <button class="button secondary sm" type="button" data-modal-open="supplier-modal" data-form-title="Edit supplier" data-form-action="{{ url_for('purchasing.supplier_edit', supplier_id=supplier.id) }}" data-record='{{ {"name": supplier.name, "contact_person": supplier.contact_person or "", "phone": supplier.phone or "", "email": supplier.email or "", "address": supplier.address or ""}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+            <form method="post" action="{{ url_for('purchasing.supplier_toggle', supplier_id=supplier.id) }}">{{ csrf() }}<button class="button {{ 'danger-ghost' if supplier.status == 'active' else 'ghost' }} sm" type="submit">{{ "Deactivate" if supplier.status == 'active' else "Activate" }}</button></form>
+          </div></td>
+        </tr>
+        {% else %}{{ empty_row(8, "No suppliers yet.", "fa-truck-field") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% call modal("supplier-modal", "Add supplier", None, "wide") %}
+<form method="post" class="form-stack" action="{{ url_for('purchasing.suppliers') }}">
+  {{ csrf() }}
+  <div class="form-grid">
+    <div class="field full"><label for="sp-name">Supplier name</label><input id="sp-name" name="name" required maxlength="180"></div>
+    <div class="field"><label for="sp-contact">Contact person</label><input id="sp-contact" name="contact_person" maxlength="120"></div>
+    <div class="field"><label for="sp-phone">Phone</label><input id="sp-phone" name="phone" maxlength="40" inputmode="tel"></div>
+    <div class="field full"><label for="sp-email">Email</label><input id="sp-email" name="email" type="email" maxlength="254"></div>
+    <div class="field full"><label for="sp-address">Address</label><textarea id="sp-address" name="address" rows="2"></textarea></div>
+  </div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save supplier</button></div>
+</form>
+{% endcall %}
+{% endblock %}

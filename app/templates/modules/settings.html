@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, csrf %}
+{% block content %}
+{{ page_header("Settings", "Pharmacy profile, receipt details and operating rules.") }}
+<form method="post" class="two-column">
+  {{ csrf() }}
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-heading"><div><h3>Pharmacy profile</h3><p>Shown in the sidebar and printed on receipts.</p></div></div>
+      <div class="panel-body form-grid">
+        {% for key in ["pharmacy_name", "pharmacy_phone", "pharmacy_email", "tin"] %}
+        <div class="field"><label for="set-{{ key }}">{{ definitions[key][1] }}</label><input id="set-{{ key }}" name="{{ key }}" type="{{ definitions[key][2] }}" value="{{ values[key] or '' }}" {{ 'required' if key == 'pharmacy_name' }} maxlength="200"></div>
+        {% endfor %}
+        <div class="field full"><label for="set-pharmacy_address">{{ definitions["pharmacy_address"][1] }}</label><input id="set-pharmacy_address" name="pharmacy_address" value="{{ values.pharmacy_address or '' }}" maxlength="255"></div>
+        <div class="field full"><label for="set-receipt_footer">{{ definitions["receipt_footer"][1] }}</label><input id="set-receipt_footer" name="receipt_footer" value="{{ values.receipt_footer or '' }}" maxlength="255"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-heading"><div><h3>Sales & inventory rules</h3><p>Applied at the point of sale and in stock alerts.</p></div></div>
+      <div class="panel-body form-grid">
+        <div class="field"><label for="set-tax_rate">Sales tax (%)</label><input id="set-tax_rate" name="tax_rate" type="number" min="0" max="100" step="0.01" value="{{ values.tax_rate }}"><span class="hint">{{ definitions.tax_rate[1] }}</span></div>
+        <div class="field"><label for="set-senior">Senior citizen / PWD discount (%)</label><input id="set-senior" name="senior_discount_rate" type="number" min="0" max="100" step="0.01" value="{{ values.senior_discount_rate }}"></div>
+        <div class="field"><label for="set-low">Default low-stock level</label><input id="set-low" name="low_stock_threshold" type="number" min="0" step="1" value="{{ values.low_stock_threshold }}"><span class="hint">Used when a product has no reorder level.</span></div>
+        <div class="field"><label for="set-exp">Expiry warning (days)</label><input id="set-exp" name="expiring_within_days" type="number" min="0" step="1" value="{{ values.expiring_within_days }}"><span class="hint">Batches expiring within this window are flagged.</span></div>
+      </div>
+    </section>
+  </div>
+  <aside class="panel sticky-summary">
+    <div class="panel-heading"><div><h3>Save changes</h3><p>Changes apply immediately and are recorded in the audit log.</p></div></div>
+    <div class="panel-body form-stack">
+      <div class="info-note"><i class="fa-solid fa-circle-info"></i><span>Philippine pharmacies usually price VAT-inclusive; keep sales tax at 0% unless you add tax at checkout.</span></div>
+      <button class="button primary full-width lg" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save settings</button>
+    </div>
+  </aside>
+</form>
+{% endblock %}

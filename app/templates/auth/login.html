@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set title = "Sign in" %}
+{% block public_content %}
+<main class="login-page">
+  <section class="login-hero" aria-hidden="true">
+    <div class="brand">
+      <span class="brand-mark"><i class="fa-solid fa-prescription-bottle-medical"></i></span>
+      <span class="brand-text"><strong>{{ pharmacy_name() }}</strong><small>Pharmacy Management</small></span>
+    </div>
+    <div>
+      <h2>Run the whole pharmacy from one secure workspace.</h2>
+      <p>Point of sale, batch and expiry tracking, purchasing and reports — built for the counter and the back office.</p>
+      <ul class="hero-points">
+        <li><i class="fa-solid fa-cash-register"></i> Fast checkout with senior &amp; PWD discounts</li>
+        <li><i class="fa-solid fa-hourglass-half"></i> First-expiry-first-out stock deduction</li>
+        <li><i class="fa-solid fa-chart-line"></i> Daily sales, profit and expense reports</li>
+      </ul>
+    </div>
+    <div class="hero-foot">Internal use only · Authorized staff</div>
+  </section>
+  <section class="login-panel">
+    <div class="login-card">
+      <div class="login-brand"><span class="brand-mark"><i class="fa-solid fa-prescription-bottle-medical"></i></span><div><strong>{{ pharmacy_name() }}</strong><small>Management System</small></div></div>
+      <div class="login-intro"><span class="eyebrow">Staff access</span><h1>Welcome back</h1><p>Sign in with your pharmacy account to continue.</p></div>
+      <form method="post" class="form-stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field"><label for="identity">Username or email</label><input id="identity" name="identity" type="text" autocomplete="username" required autofocus maxlength="254" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="password">Password</label><div class="password-field"><input id="password" name="password" type="password" autocomplete="current-password" required><button class="password-toggle" type="button" aria-label="Show password" data-password-toggle><i class="fa-regular fa-eye"></i></button></div></div>
+        <button class="button primary full-width lg" type="submit">Sign in <i class="fa-solid fa-arrow-right"></i></button>
+      </form>
+      <div class="login-note"><i class="fa-solid fa-lock"></i> Secure access for authorized {{ pharmacy_name() }} staff</div>
+    </div>
+  </section>
+</main>
+{% endblock %}

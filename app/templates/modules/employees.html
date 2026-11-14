@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "macros.html" import page_header, modal, csrf, badge, empty_row %}
+{% block content %}
+{% call page_header("Employees", "Staff records and their login access. Cashiers can use the POS, check stock and manage customers.") %}
+  <button class="button primary" type="button" data-modal-open="employee-modal" data-form-action="{{ url_for('admin.employees') }}" data-form-title="Add employee"><i class="fa-solid fa-user-plus"></i> Add employee</button>
+{% endcall %}
+<section class="panel">
+  <div class="filter-bar">
+    <label class="search-box grow"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Search staff…" data-table-search></label>
+    <span class="result-count" data-result-count>{{ rows|length }} employees</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" data-searchable-table>
+      <thead><tr><th>Employee</th><th>Position</th><th>Contact</th><th>Login</th><th>Role</th><th>Last sign-in</th><th>Status</th><th class="num">Actions</th></tr></thead>
+      <tbody>
+        {% for employee in rows %}
+        {% set user = employee.user %}
+        <tr>
+          <td class="strong">{{ employee.first_name }} {{ employee.last_name }}<span class="cell-sub">{{ employee.employee_number }}</span></td>
+          <td>{{ employee.position or "—" }}</td>
+          <td>{{ employee.phone or "—" }}{% if employee.email %}<span class="cell-sub">{{ employee.email }}</span>{% endif %}</td>
+          <td>{{ "@" ~ user.username if user else "No login" }}</td>
+          <td>{% if user %}{{ badge(user.role.name|lower, user.role_label) }}{% else %}—{% endif %}</td>
+          <td class="nowrap">{{ user.last_login_at|localtime if user and user.last_login_at else "—" }}</td>
+          <td>{{ badge(employee.status) }}</td>
+          <td class="num"><div class="row-actions">
+            <button class="button secondary sm" type="button" data-modal-open="employee-modal" data-form-title="Edit {{ employee.first_name }}" data-form-action="{{ url_for('admin.employee_edit', employee_id=employee.id) }}"
+              data-record='{{ {"employee_number": employee.employee_number, "first_name": employee.first_name, "last_name": employee.last_name, "position": employee.position or "", "email": employee.email or "", "phone": employee.phone or "", "username": user.username if user else "", "role_id": user.role_id if user else "", "login_enabled": user.is_active if user else false, "password": ""}|tojson }}'><i class="fa-solid fa-pen"></i> Edit</button>
+            {% if user %}<button class="button ghost sm" type="button" data-modal-open="password-modal" data-form-action="{{ url_for('admin.reset_password', user_id=user.id) }}" data-form-title="Reset password for @{{ user.username }}"><i class="fa-solid fa-key"></i> Password</button>{% endif %}
+            {% if not user or user.id != current_user.id %}
+            <form method="post" action="{{ url_for('admin.employee_toggle', employee_id=employee.id) }}" {% if employee.status == 'active' %}data-confirm="Deactivate {{ employee.first_name }}? Their login will be disabled."{% endif %}>{{ csrf() }}<button class="button {{ 'danger-ghost' if employee.status == 'active' else 'ghost' }} sm" type="submit">{{ "Deactivate" if employee.status == 'active' else "Activate" }}</button></form>
+            {% endif %}
+          </div></td>
+        </tr>
+        {% else %}{{ empty_row(8, "No employees recorded.", "fa-user-doctor") }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if orphan_users %}
+<section class="panel section-gap">
+  <div class="panel-heading"><div><h3>System accounts</h3><p>Logins without an employee profile (e.g. created from the command line).</p></div></div>
+  <div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Username</th><th>Role</th><th>Last sign-in</th><th>Status</th><th class="num">Actions</th></tr></thead>
+    <tbody>
+      {% for user in orphan_users %}
+      <tr>
+        <td class="strong">@{{ user.username }}</td>
+        <td>{{ badge(user.role.name|lower, user.role_label) }}</td>
+        <td>{{ user.last_login_at|localtime if user.last_login_at else "—" }}</td>
+        <td>{{ badge('active' if user.is_active else 'inactive') }}</td>
+        <td class="num"><button class="button ghost sm" type="button" data-modal-open="password-modal" data-form-action="{{ url_for('admin.reset_password', user_id=user.id) }}" data-form-title="Reset password for @{{ user.username }}"><i class="fa-solid fa-key"></i> Password</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+
+{% call modal("employee-modal", "Add employee", None, "wide") %}
+<form method="post" class="form-stack" action="{{ url_for('admin.employees') }}">
+  {{ csrf() }}
+  <div class="form-grid three">
+    <div class="field"><label for="em-number">Employee no.</label><input id="em-number" name="employee_number" value="{{ next_number }}" required maxlength="40"></div>
+    <div class="field"><label for="em-first">First name</label><input id="em-first" name="first_name" required maxlength="80"></div>
+    <div class="field"><label for="em-last">Last name</label><input id="em-last" name="last_name" required maxlength="80"></div>
+    <div class="field"><label for="em-position">Position</label><input id="em-position" name="position" maxlength="100" list="positions" value="Cashier"><datalist id="positions"><option value="Cashier"><option value="Pharmacist"><option value="Pharmacy Assistant"><option value="Stock Clerk"></datalist></div>
+    <div class="field"><label for="em-phone">Phone</label><input id="em-phone" name="phone" maxlength="40" inputmode="tel"></div>
+    <div class="field"><label for="em-email">Email</label><input id="em-email" name="email" type="email" maxlength="254"></div>
+  </div>
+  <p class="form-section-title">Login access</p>
+  <label class="check"><input type="checkbox" name="login_enabled" data-toggle-target="#account-fields" checked> Allow this employee to sign in</label>
+  <div id="account-fields" class="form-grid three">
+    <div class="field"><label for="em-username">Username</label><input id="em-username" name="username" maxlength="80" autocomplete="off" data-required></div>
+    <div class="field"><label for="em-role">Role</label><select id="em-role" name="role_id">{% for role in roles %}<option value="{{ role.id }}" {{ 'selected' if role.name == 'CASHIER' }}>{{ role.name|title }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="em-password">Password</label><input id="em-password" name="password" type="password" minlength="{{ min_password }}" autocomplete="new-password"><span class="hint" data-create-only>Required for a new login · min. {{ min_password }} characters.</span><span class="hint" data-edit-only>Leave blank to keep the current password.</span></div>
+  </div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save employee</button></div>
+</form>
+{% endcall %}
+
+{% call modal("password-modal", "Reset password") %}
+<form method="post" class="form-stack">
+  {{ csrf() }}
+  <div class="field"><label for="rp-password">New password</label><div class="password-field"><input id="rp-password" name="password" type="password" minlength="{{ min_password }}" required autocomplete="new-password"><button class="password-toggle" type="button" aria-label="Show password" data-password-toggle><i class="fa-regular fa-eye"></i></button></div><span class="hint">At least {{ min_password }} characters. Share it with the employee privately.</span></div>
+  <div class="form-actions"><button class="button secondary" type="button" data-modal-close>Cancel</button><button class="button primary" type="submit"><i class="fa-solid fa-key"></i> Reset password</button></div>
+</form>
+{% endcall %}
+{% endblock %}

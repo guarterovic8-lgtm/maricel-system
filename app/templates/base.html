@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#312e81">
+  <title>{{ title or "Dashboard" }} | {{ pharmacy_name() }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% if current_user.is_authenticated %}
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <div class="sidebar-top">
+        <a class="brand" href="{{ url_for('main.dashboard') }}">
+          <span class="brand-mark"><i class="fa-solid fa-prescription-bottle-medical"></i></span>
+          <span class="brand-text"><strong>{{ pharmacy_name() }}</strong><small>Pharmacy Management</small></span>
+        </a>
+        <button class="icon-button sidebar-close" type="button" aria-label="Close navigation" data-menu-close><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <nav class="side-nav">
+        {% for section, items in nav_sections %}
+          <div class="nav-caption">{{ section }}</div>
+          {% for key, label, endpoint, permission, icon in items %}
+            <a class="nav-link {{ 'active' if nav == key else '' }}" href="{{ url_for(endpoint) }}" {% if nav == key %}aria-current="page"{% endif %}>
+              <i class="fa-solid {{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="status-chip"><span class="status-dot"></span> System online · {{ today().strftime("%b %d, %Y") }}</div>
+      </div>
+    </aside>
+    <div class="sidebar-backdrop" data-menu-close hidden></div>
+    <main class="main-shell">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false" data-menu-toggle><i class="fa-solid fa-bars"></i></button>
+        <div class="page-heading"><span class="eyebrow">{{ pharmacy_name() }}</span><h1>{{ title or "Dashboard" }}</h1></div>
+        <div class="topbar-actions">
+          {% if current_user.has_permission("sales.process") and nav != "pos" %}
+            <a class="button primary sm topbar-pos" href="{{ url_for('sales.pos') }}"><i class="fa-solid fa-cash-register"></i><span>New sale</span></a>
+          {% endif %}
+          <div class="user-menu" data-dropdown>
+            <button class="user-button" type="button" aria-haspopup="true" aria-expanded="false" data-dropdown-toggle>
+              <span class="avatar">{{ current_user.display_name[:1]|upper }}</span>
+              <span class="user-meta"><strong>{{ current_user.display_name }}</strong><small>{{ current_user.role_label }}</small></span>
+              <i class="fa-solid fa-chevron-down user-caret" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown-menu" role="menu" hidden>
+              <div class="dropdown-head"><strong>{{ current_user.display_name }}</strong><small>@{{ current_user.username }} · {{ current_user.role_label }}</small></div>
+              <a class="dropdown-item" role="menuitem" href="{{ url_for('main.account') }}"><i class="fa-solid fa-user-gear"></i> My account</a>
+              <form action="{{ url_for('auth.logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dropdown-item danger" role="menuitem" type="submit"><i class="fa-solid fa-arrow-right-from-bracket"></i> Log out</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </header>
+      <section class="page-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="flash-stack" aria-live="polite">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}" role="status">
+                <i class="fa-solid {{ 'fa-circle-check' if category == 'success' else ('fa-circle-info' if category == 'info' else 'fa-circle-exclamation') }}"></i>
+                <span>{{ message }}</span>
+                <button type="button" class="flash-close" aria-label="Dismiss" data-flash-close><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+  </div>
+  {% else %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}<div class="login-flashes">{% for category, message in messages %}<div class="flash {{ category }}" role="status"><i class="fa-solid fa-circle-info"></i><span>{{ message }}</span></div>{% endfor %}</div>{% endif %}
+    {% endwith %}
+    {% block public_content %}{% endblock %}
+  {% endif %}
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
