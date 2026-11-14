@@ -68,7 +68,7 @@ Open `http://127.0.0.1:5000`. Demo accounts are `owner`, `cashier` and `cashier2
 
 ## Deploying to Railway
 
-The repository includes `railway.json` and `start.sh`. On every deploy, `start.sh` runs `db upgrade` and `seed-roles`, loads demo data when `SEED_DEMO_DATA=true` (skipped if products already exist), and starts Gunicorn.
+The repository includes `start.sh`. On every deploy, `start.sh` runs `db upgrade` and `seed-roles`, loads demo data when `SEED_DEMO_DATA=true` (skipped if products already exist), and starts Gunicorn.
 
 1. Create a Railway project from this GitHub repository and add a **MySQL** database service.
 2. Set these variables on the web service:
@@ -83,7 +83,8 @@ The repository includes `railway.json` and `start.sh`. On every deploy, `start.s
    | `SEED_DEMO_DATA` | `true` for a demo, `false` for a clean install |
    | `DEMO_OWNER_PASSWORD`, `DEMO_CASHIER_PASSWORD` | 12+ character passwords for the demo accounts |
 
-3. Generate a public domain under the service's **Networking** settings. `GET /health` is used as the health check.
+3. In the service's **Settings → Deploy**, set the start command to `sh start.sh`, the health check path to `/health` (timeout 300 s, because the first deploy loads the demo data before the server starts), and the restart policy to *On failure*.
+4. Generate a public domain under the service's **Networking** settings.
 
 ## Database and migrations
 
